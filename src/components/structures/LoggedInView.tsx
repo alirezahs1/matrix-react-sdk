@@ -370,8 +370,8 @@ class LoggedInView extends React.Component<IProps, IState> {
 
     private shouldCloseMenu = (hash: string) => {
 
-        if (hash.startsWith('#/room/!') && previousHash.startsWith('#/room/!')) {
-            const regex = /^#\/room\/!(.*?):(.*?)$/;
+        if (hash.startsWith('#/room/')) {
+            const regex = /^#\/room\/(.*?):(.*?)$/;
 
             if (hash.split(regex)[1] !== previousHash.split(regex)[1]) {
                 previousHash = hash;
