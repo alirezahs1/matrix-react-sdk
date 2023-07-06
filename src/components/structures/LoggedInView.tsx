@@ -32,8 +32,6 @@ import dis from "../../dispatcher/dispatcher";
 import { IMatrixClientCreds } from "../../MatrixClientPeg";
 import SettingsStore from "../../settings/SettingsStore";
 import { SettingLevel } from "../../settings/SettingLevel";
-import ResizeHandle from "../views/elements/ResizeHandle";
-import { CollapseDistributor, Resizer } from "../../resizer";
 import MatrixClientContext from "../../contexts/MatrixClientContext";
 import ResizeNotifier from "../../utils/ResizeNotifier";
 import PlatformPeg from "../../PlatformPeg";
@@ -46,7 +44,6 @@ import RoomListStore from "../../stores/room-list/RoomListStore";
 import NonUrgentToastContainer from "./NonUrgentToastContainer";
 import { IOOBData, IThreepidInvite } from "../../stores/ThreepidInviteStore";
 import Modal from "../../Modal";
-import { ICollapseConfig } from "../../resizer/distributors/collapse";
 import { getKeyBindingsManager } from "../../KeyBindingsManager";
 import { IOpts } from "../../createRoom";
 import SpacePanel from "../views/spaces/SpacePanel";
@@ -113,7 +110,10 @@ interface IState {
     useCompactLayout: boolean;
     activeCalls: Array<MatrixCall>;
     backgroundImage?: string;
+    isMenuOpen: boolean;
 }
+
+let previousHash = '';
 
 /**
  * This is what our MatrixChat shows when we are logged in. The precise view is
@@ -129,12 +129,9 @@ class LoggedInView extends React.Component<IProps, IState> {
 
     protected readonly _matrixClient: MatrixClient;
     protected readonly _roomView: React.RefObject<RoomViewType>;
-    protected readonly _resizeContainer: React.RefObject<HTMLDivElement>;
-    protected readonly resizeHandler: React.RefObject<HTMLDivElement>;
     protected layoutWatcherRef?: string;
     protected compactLayoutWatcherRef?: string;
     protected backgroundImageWatcherRef?: string;
-    protected resizer?: Resizer;
 
     public constructor(props: IProps) {
         super(props);
@@ -145,7 +142,11 @@ class LoggedInView extends React.Component<IProps, IState> {
             useCompactLayout: SettingsStore.getValue("useCompactLayout"),
             usageLimitDismissed: false,
             activeCalls: LegacyCallHandler.instance.getAllActiveCalls(),
+            isMenuOpen: false,
         };
+
+        this.onToggleMenu = this.onToggleMenu.bind(this);
+        this.handleLocationChange = this.handleLocationChange.bind(this);
 
         // stash the MatrixClient in case we log out before we are unmounted
         this._matrixClient = this.props.matrixClient;
@@ -155,8 +156,6 @@ class LoggedInView extends React.Component<IProps, IState> {
         fixupColorFonts();
 
         this._roomView = React.createRef();
-        this._resizeContainer = React.createRef();
-        this.resizeHandler = React.createRef();
     }
 
     public componentDidMount(): void {
@@ -185,12 +184,10 @@ class LoggedInView extends React.Component<IProps, IState> {
             this.refreshBackgroundImage,
         );
 
-        this.resizer = this.createResizer();
-        this.resizer.attach();
-
         OwnProfileStore.instance.on(UPDATE_EVENT, this.refreshBackgroundImage);
-        this.loadResizerPreferences();
         this.refreshBackgroundImage();
+
+        window.addEventListener('hashchange', this.handleLocationChange, false);
     }
 
     public componentWillUnmount(): void {
@@ -203,7 +200,8 @@ class LoggedInView extends React.Component<IProps, IState> {
         if (this.layoutWatcherRef) SettingsStore.unwatchSetting(this.layoutWatcherRef);
         if (this.compactLayoutWatcherRef) SettingsStore.unwatchSetting(this.compactLayoutWatcherRef);
         if (this.backgroundImageWatcherRef) SettingsStore.unwatchSetting(this.backgroundImageWatcherRef);
-        this.resizer?.detach();
+        
+        window.removeEventListener('hashchange', this.handleLocationChange, false);
     }
 
     private onCallState = (): void => {
@@ -229,54 +227,6 @@ class LoggedInView extends React.Component<IProps, IState> {
         }
         return this._roomView.current.canResetTimeline();
     };
-
-    private createResizer(): Resizer {
-        let panelSize: number | null;
-        let panelCollapsed: boolean;
-        const collapseConfig: ICollapseConfig = {
-            // TODO decrease this once Spaces launches as it'll no longer need to include the 56px Community Panel
-            toggleSize: 206 - 50,
-            onCollapsed: (collapsed) => {
-                panelCollapsed = collapsed;
-                if (collapsed) {
-                    dis.dispatch({ action: "hide_left_panel" });
-                    window.localStorage.setItem("mx_lhs_size", "0");
-                } else {
-                    dis.dispatch({ action: "show_left_panel" });
-                }
-            },
-            onResized: (size) => {
-                panelSize = size;
-                this.props.resizeNotifier.notifyLeftHandleResized();
-            },
-            onResizeStart: () => {
-                this.props.resizeNotifier.startResizing();
-            },
-            onResizeStop: () => {
-                if (!panelCollapsed) window.localStorage.setItem("mx_lhs_size", "" + panelSize);
-                this.props.resizeNotifier.stopResizing();
-            },
-            isItemCollapsed: (domNode) => {
-                return domNode.classList.contains("mx_LeftPanel_minimized");
-            },
-            handler: this.resizeHandler.current ?? undefined,
-        };
-        const resizer = new Resizer(this._resizeContainer.current, CollapseDistributor, collapseConfig);
-        resizer.setClassNames({
-            handle: "mx_ResizeHandle",
-            vertical: "mx_ResizeHandle--vertical",
-            reverse: "mx_ResizeHandle_reverse",
-        });
-        return resizer;
-    }
-
-    private loadResizerPreferences(): void {
-        let lhsSize = parseInt(window.localStorage.getItem("mx_lhs_size")!, 10);
-        if (isNaN(lhsSize)) {
-            lhsSize = 350;
-        }
-        this.resizer?.forHandleWithId("lp-resizer")?.resize(lhsSize);
-    }
 
     private onAccountData = (event: MatrixEvent): void => {
         if (event.getType() === "m.ignored_user_list") {
@@ -402,6 +352,35 @@ class LoggedInView extends React.Component<IProps, IState> {
             );
         }
     };
+
+    private handleLocationChange = () => {
+
+        if (this.shouldCloseMenu(window.location.hash)) {
+            this.setState({
+                isMenuOpen: false,
+            });
+        }
+    }
+
+    private onToggleMenu = () => {
+        this.setState({
+            isMenuOpen: !this.state.isMenuOpen,
+        });
+    }
+
+    private shouldCloseMenu = (hash: string) => {
+
+        if (hash.startsWith('#/room/!') && previousHash.startsWith('#/room/!')) {
+            const regex = /^#\/room\/!(.*?):(.*?)$/;
+
+            if (hash.split(regex)[1] !== previousHash.split(regex)[1]) {
+                previousHash = hash;
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /*
     SOME HACKERY BELOW:
@@ -637,6 +616,8 @@ class LoggedInView extends React.Component<IProps, IState> {
                         resizeNotifier={this.props.resizeNotifier}
                         justCreatedOpts={this.props.roomJustCreatedOpts}
                         forceTimeline={this.props.forceTimeline}
+                        isMenuOpen={this.state.isMenuOpen}
+                        onToggleMenu={this.onToggleMenu}
                     />
                 );
                 break;
@@ -662,6 +643,10 @@ class LoggedInView extends React.Component<IProps, IState> {
             "mx_MatrixChat": true,
             "mx_MatrixChat--with-avatar": this.state.backgroundImage,
         });
+        const outerWrapperClasses = classNames({
+            "mx_LeftPanel_outerWrapper": true,
+            "mx_LeftPanel_outerWrapper_visible": this.state.isMenuOpen,
+        });
 
         const audioFeedArraysForCalls = this.state.activeCalls.map((call) => {
             return <AudioFeedArrayForLegacyCall call={call} key={call.callId} />;
@@ -677,7 +662,7 @@ class LoggedInView extends React.Component<IProps, IState> {
                 >
                     <ToastContainer />
                     <div className={bodyClasses}>
-                        <div className="mx_LeftPanel_outerWrapper">
+                        <div className={outerWrapperClasses}>
                             <LeftPanelLiveShareWarning isMinimized={this.props.collapseLhs || false} />
                             <nav className="mx_LeftPanel_wrapper">
                                 <BackdropPanel blurMultiplier={0.5} backgroundImage={this.state.backgroundImage} />
@@ -685,18 +670,18 @@ class LoggedInView extends React.Component<IProps, IState> {
                                 <BackdropPanel backgroundImage={this.state.backgroundImage} />
                                 <div
                                     className="mx_LeftPanel_wrapper--user"
-                                    ref={this._resizeContainer}
                                     data-collapsed={this.props.collapseLhs ? true : undefined}
                                 >
                                     <LeftPanel
                                         pageType={this.props.page_type as PageTypes}
                                         isMinimized={this.props.collapseLhs || false}
                                         resizeNotifier={this.props.resizeNotifier}
+                                        isMenuOpen={this.state.isMenuOpen}
+                                        onToggleMenu={this.onToggleMenu}
                                     />
                                 </div>
                             </nav>
                         </div>
-                        <ResizeHandle passRef={this.resizeHandler} id="lp-resizer" />
                         <div className="mx_RoomView_wrapper">{pageElement}</div>
                     </div>
                 </div>

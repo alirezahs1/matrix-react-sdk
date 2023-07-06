@@ -612,17 +612,7 @@ export default class RoomList extends React.PureComponent<IProps, IState> {
             const aesthetics = TAG_AESTHETICS[orderedTagId];
             if (!aesthetics) throw new Error(`Tag ${orderedTagId} does not have aesthetics`);
 
-            let alwaysVisible = ALWAYS_VISIBLE_TAGS.includes(orderedTagId);
-            if (
-                (this.props.activeSpace === MetaSpace.Favourites && orderedTagId !== DefaultTagID.Favourite) ||
-                (this.props.activeSpace === MetaSpace.People && orderedTagId !== DefaultTagID.DM) ||
-                (this.props.activeSpace === MetaSpace.Orphans && orderedTagId === DefaultTagID.DM) ||
-                (!isMetaSpace(this.props.activeSpace) &&
-                    orderedTagId === DefaultTagID.DM &&
-                    !SettingsStore.getValue("Spaces.showPeopleInSpace", this.props.activeSpace))
-            ) {
-                alwaysVisible = false;
-            }
+            const alwaysVisible = true;
 
             let forceExpanded = false;
             if (

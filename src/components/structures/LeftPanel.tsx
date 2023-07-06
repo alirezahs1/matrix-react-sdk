@@ -50,6 +50,8 @@ interface IProps {
     isMinimized: boolean;
     pageType: PageType;
     resizeNotifier: ResizeNotifier;
+    isMenuOpen: boolean;
+    onToggleMenu: () => void;
 }
 
 enum BreadcrumbsMode {
@@ -383,6 +385,7 @@ export default class LeftPanel extends React.Component<IProps, IState> {
         const containerClasses = classNames({
             mx_LeftPanel: true,
             mx_LeftPanel_minimized: this.props.isMinimized,
+            mx_LeftPanel_visible: this.props.isMenuOpen,
         });
 
         const roomListClasses = classNames("mx_LeftPanel_actualRoomListContainer", "mx_AutoHideScrollbar");

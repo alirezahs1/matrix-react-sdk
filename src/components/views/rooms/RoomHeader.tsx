@@ -476,6 +476,8 @@ export interface IProps {
     enableRoomOptionsMenu?: boolean;
     viewingCall: boolean;
     activeCall: Call | null;
+    isMenuOpen: boolean;
+    onToggleMenu: () => void;
 }
 
 interface IState {
@@ -803,6 +805,7 @@ export default class RoomHeader extends React.Component<IProps, IState> {
                     className="mx_RoomHeader_wrapper"
                     aria-owns={this.state.rightPanelOpen ? "mx_RightPanel" : undefined}
                 >
+                    <div className="mx_RoomHeader_menu-handler" onClick={this.props.onToggleMenu} />
                     <div className="mx_RoomHeader_avatar">{roomAvatar}</div>
                     {icon}
                     {name}

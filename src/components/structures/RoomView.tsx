@@ -142,6 +142,9 @@ interface IRoomProps {
 
     // Called with the credentials of a registered user (if they were a ROU that transitioned to PWLU)
     onRegistered?(credentials: IMatrixClientCreds): void;
+
+    isMenuOpen: boolean;
+    onToggleMenu: () => void;
 }
 
 // This defines the content of the mainSplit.
@@ -2482,6 +2485,8 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
                             enableRoomOptionsMenu={!this.viewsLocalRoom}
                             viewingCall={viewingCall}
                             activeCall={this.state.activeCall}
+                            isMenuOpen={this.props.isMenuOpen}
+                            onToggleMenu={this.props.onToggleMenu}
                         />
                         <MainSplit
                             panel={rightPanel}

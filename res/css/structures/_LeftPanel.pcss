@@ -22,10 +22,22 @@ limitations under the License.
 }
 
 .mx_LeftPanel_outerWrapper {
-    display: flex;
+    display: none;
     flex-direction: column;
-    max-width: 50%;
     position: relative;
+
+    &.mx_LeftPanel_outerWrapper_visible {
+        display: flex;
+    }
+
+    @media (min-width: 768px) {
+        max-width: 50%;
+    }
+    @media (max-width: 767px) {
+        position: absolute;
+        z-index: 10;
+        inset: 0;
+    }
 
     /* Contain the amount of layers rendered by constraining what actually needs re-layering via css */
     contain: layout paint;
@@ -48,9 +60,17 @@ limitations under the License.
         overflow: hidden;
         position: relative;
 
-        &[data-collapsed] {
-            max-width: var(--collapsedWidth);
+        @media (max-width: 767px) {
+            width: 100%;
         }
+
+        @media (min-width: 768px) {
+            width: 350px;
+            &[data-collapsed] {
+                max-width: var(--collapsedWidth);
+            }
+        }
+
     }
 }
 
