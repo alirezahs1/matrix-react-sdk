@@ -187,7 +187,9 @@ class LoggedInView extends React.Component<IProps, IState> {
         OwnProfileStore.instance.on(UPDATE_EVENT, this.refreshBackgroundImage);
         this.refreshBackgroundImage();
 
-        window.addEventListener('hashchange', this.handleLocationChange, false);
+        if (this.isMobile()) {
+            window.addEventListener('hashchange', this.handleLocationChange, false);
+        }
     }
 
     public componentWillUnmount(): void {
@@ -366,6 +368,10 @@ class LoggedInView extends React.Component<IProps, IState> {
         this.setState({
             isMenuOpen: !this.state.isMenuOpen,
         });
+    }
+
+    private isMobile = () => {
+        return window.matchMedia("(max-width: 767px)");
     }
 
     private shouldCloseMenu = (hash: string) => {
